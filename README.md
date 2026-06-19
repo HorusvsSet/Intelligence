@@ -1,0 +1,2 @@
+# Intelligence
+Rule discovery game
