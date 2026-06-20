@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Intelligence</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#0d0d0d;color:#f0f0f0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+
+/* ====== HOME ====== */
+#home{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:clamp(32px,8vh,56px)}
+#home h1{font-size:clamp(28px,6vw,48px);font-weight:200;letter-spacing:.04em;color:#ccc}
+#play-btn{width:clamp(56px,14vw,72px);height:clamp(56px,14vw,72px);border-radius:50%;border:1.5px solid rgba(255,255,255,.2);background:transparent;color:#aaa;font-size:clamp(20px,5vw,28px);cursor:pointer;transition:all .3s;display:flex;align-items:center;justify-content:center}
+#play-btn:hover,#play-btn:active{border-color:rgba(255,255,255,.5);color:#fff;transform:scale(1.05)}
+#auto-btn{position:fixed;bottom:clamp(16px,4vh,32px);left:50%;transform:translateX(-50%);background:transparent;border:1px solid rgba(255,255,255,.06);color:rgba(255,255,255,.15);font-size:clamp(11px,2.5vw,14px);padding:clamp(4px,1vw,8px) clamp(12px,3vw,20px);border-radius:clamp(8px,2vw,14px);cursor:pointer;transition:all .3s}
+#auto-btn:hover,#auto-btn:active{border-color:rgba(255,255,255,.25);color:rgba(255,255,255,.5)}
+
+/* ====== GAME ====== */
+#game{display:none;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:clamp(8px,3vw,24px);gap:clamp(16px,4vh,36px)}
+#game.active{display:flex}
+
+/* Filas de completados (4 arriba, 4 abajo) — slots circulares con anillo */
+.done-row{display:flex;gap:clamp(10px,2.5vw,20px);height:clamp(56px,14vw,80px);opacity:1}
+.done-slot{width:clamp(56px,14vw,80px);height:clamp(56px,14vw,80px);border-radius:50%;border:1.5px solid rgba(255,255,255,.06);background:transparent;display:flex;align-items:center;justify-content:center;padding:clamp(8px,2vw,14px);transition:all .5s ease}
+.done-slot img{opacity:.35;transition:opacity .4s}
+.done-slot.got img{opacity:1}
+.done-slot.got{border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.03);box-shadow:0 0 0 clamp(2px,.5vw,5px) rgba(255,255,255,.04),0 0 clamp(12px,3vw,24px) rgba(255,255,255,.03)}
+.done-slot img{max-width:78%;max-height:78%;object-fit:contain;pointer-events:none}
+
+/* Tablero */
+#board{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);gap:clamp(6px,2vw,14px);width:min(92vw,92vh*1.33,520px);aspect-ratio:4/3}
+.cell{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:clamp(10px,2.5vw,18px);cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:clamp(8px,2.5vw,14px)}
+.cell:active{transform:scale(.96);background:rgba(255,255,255,.06)}
+.cell img{max-width:78%;max-height:78%;object-fit:contain;pointer-events:none;-webkit-user-drag:none}
+/* fade-in */
+.cell.fi{animation:fi .35s ease-out}
+@keyframes fi{0%{opacity:0;transform:scale(.82)}100%{opacity:1;transform:scale(1)}}
+/* Win: 12 tiles en línea, bordes desaparecen, compleción oculta */
+#game.won #board{display:flex;flex-direction:row;flex-wrap:nowrap;aspect-ratio:auto;width:min(88vw,520px);gap:clamp(1px,.3vw,4px);transition:gap .8s ease,width .8s ease}
+#game.won .cell{border-color:transparent!important;background:transparent!important;padding:clamp(3px,1vw,8px);transition:border-color .7s ease,background .7s ease,padding .8s ease,transform .8s ease,flex .8s ease}
+#game.won .cell img{max-width:88%;max-height:88%;transition:max-width .8s ease,max-height .8s ease}
+#game.won .done-row{opacity:0;height:0;overflow:hidden;margin:0;transition:all .5s ease}
+/* flash win (símbolos 1-7) */
+.cell.win{animation:win .6s ease-out}
+@keyframes win{0%{background:rgba(255,255,255,.2);transform:scale(1.04)}100%{background:rgba(255,255,255,.03);transform:scale(1)}}
+/* resplandor hover */
+.cell.hl{background:rgba(255,255,255,.08)!important;border-color:rgba(255,255,255,.25)!important}
+
+/* ====== BACK ====== */
+#back{position:fixed;top:clamp(10px,3vw,20px);left:clamp(10px,3vw,20px);width:clamp(32px,8vw,44px);height:clamp(32px,8vw,44px);border-radius:50%;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:#888;font-size:clamp(14px,3.5vw,20px);cursor:pointer;display:none;align-items:center;justify-content:center;z-index:10;transition:all .2s}
+#back:hover,#back:active{color:#fff;border-color:rgba(255,255,255,.3)}
+#game.active ~ #back,#back.active,#reset-btn.active{display:flex}
+/* ====== RESET ====== */
+#reset-btn{position:fixed;top:clamp(10px,3vw,20px);right:clamp(10px,3vw,20px);width:clamp(32px,8vw,44px);height:clamp(32px,8vw,44px);border-radius:50%;border:1px solid rgba(255,255,255,.08);background:transparent;color:#555;font-size:clamp(13px,3.2vw,18px);cursor:pointer;display:none;align-items:center;justify-content:center;z-index:10;transition:all .2s}
+#reset-btn:hover,#reset-btn:active{color:#c44;border-color:rgba(204,68,68,.3);background:rgba(204,68,68,.06)}
+</style>
+</head>
+<body>
+
+<div id="home">
+  <h1>Intelligence</h1>
+  <button id="play-btn">▶</button>
+  <button id="auto-btn" title="Completar todos menos 6">auto</button>
+</div>
+
+<div id="game">
+  <div id="done-top" class="done-row"></div>
+  <div id="board"></div>
+  <div id="done-bottom" class="done-row"></div>
+</div>
+
+<button id="back">←</button>
+<button id="reset-btn" title="Reset progress">↺</button>
+
+<script>
+// =========== CONFIG ===========
+// Sprites: 0.png=nula  normal=v.png  off=0v.png  on=1v.png  master=2v.png  super=3v.png
+const IMG_BOARD=v=>v+'.png';
+const IMG_OFF=v=>'0'+v+'.png';
+const IMG_ON=v=>'1'+v+'.png';
+const IMG_MASTER=v=>'2'+v+'.png';
+const IMG_SUPER=v=>'3'+v+'.png';
+const R=3,C=4,N=12;
+const INIT=[1,2,3,4, 5,5,6,7, 4,2,8,4];
+const DONE_KEY='iq-done';
+const SUPER_KEY='iq-super';
+
+const SYMPAT=[1,2,3,4, 5,6,6,5, 4,3,2,1];
+const SYMMAP=(()=>{const m=Array(N).fill(-1);for(let i=0;i<N;i++){if(m[i]!==-1)continue;const v=SYMPAT[i];for(let j=0;j<N;j++)if(j!==i&&SYMPAT[j]===v){m[i]=j;m[j]=i;break}}return m})();
+
+const cross=i=>{const r=Math.floor(i/C),c=i%C,o=[];if(r>0)o.push((r-1)*C+c);if(r<R-1)o.push((r+1)*C+c);if(c>0)o.push(r*C+c-1);if(c<C-1)o.push(r*C+c+1);return o};
+const wrap=(v,d)=>((v-1+d)%8+8)%8+1;
+
+const SYM={
+1:{act(i){const n=cross(i);if(!n.length)return null;const c=new Map();n.forEach(j=>c.set(j,-1));return{ch:c,af:n}}},
+2:{act(i){const n=cross(i);if(!n.length)return null;const c=new Map();n.forEach(j=>c.set(j,+1));return{ch:c,af:n}}},
+3:{act(i){const p=SYMMAP[i];if(p<0)return null;const c=new Map();c.set(p,+1);return{ch:c,af:[p]}}},
+4:{act(i,b){const r=Math.floor(i/C),c=i%C;const s=new Map();const a=[];if(r>0&&r<R-1){const t=(r-1)*C+c;const bot=(r+1)*C+c;s.set(bot,b[t]);a.push(bot)}if(c>0&&c<C-1){const le=r*C+(c-1);const ri=r*C+(c+1);s.set(ri,b[le]);a.push(ri)}if(!s.size)return null;return{st:s,af:a}}},
+5:{act(i){const r=Math.floor(i/C),c=i%C;const ch=new Map();const a=[];[[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc])=>{const rr=r+dr,cc=c+dc;if(rr>=0&&rr<R&&cc>=0&&cc<C){const j=rr*C+cc;ch.set(j,+1);a.push(j)}});if(!ch.size)return null;return{ch:ch,af:a}}},
+6:{act(i){const n=cross(i);if(!n.length)return null;const s=new Map();n.forEach(j=>s.set(j,6));return{st:s,af:n}}},
+7:{act(i){const r=Math.floor(i/C),c=i%C;const ch=new Map();const a=[];for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++){if(dr===0&&dc===0)continue;if(Math.abs(dr)<2&&Math.abs(dc)<2)continue;const rr=r+dr,cc=c+dc;if(rr>=0&&rr<R&&cc>=0&&cc<C){const j=rr*C+cc;ch.set(j,+1);a.push(j)}}if(!ch.size)return null;return{ch:ch,af:a}}},
+8:{act(i,b){const r=Math.floor(i/C),c=i%C;const lc=c,rc=C-1-c;if(lc===rc)return null;const ch=new Map();const a=[];if(lc>rc){for(let cc=0;cc<c;cc++){const j=r*C+cc;ch.set(j,+1);a.push(j)}}else{for(let cc=c+1;cc<C;cc++){const j=r*C+cc;ch.set(j,+1);a.push(j)}}if(!ch.size)return null;return{ch:ch,af:a}}}
+};
+
+// =========== ESTADO ===========
+let board=INIT.slice(),moves=0,history=[],fadeSet=new Set(),fadeT=null,touching=false;
+let done=new Set(); // números completados
+let superDone=new Set(); // números con super-maestría activada (31.png…)
+let locked=false; // bloquea clicks durante animación
+const allDone=()=>done.size===8;
+
+function isWon(){return board.every(v=>v===board[0])}
+function loadDone(){try{const r=localStorage.getItem(DONE_KEY);if(r)done=new Set(JSON.parse(r).filter(v=>v>=1&&v<=8));}catch{}}
+function saveDone(){try{localStorage.setItem(DONE_KEY,JSON.stringify([...done]));}catch{}}
+function loadSuper(){try{const r=localStorage.getItem(SUPER_KEY);if(r)superDone=new Set(JSON.parse(r));}catch{}}
+function saveSuper(){try{localStorage.setItem(SUPER_KEY,JSON.stringify([...superDone]));}catch{}}
+
+// =========== RENDER ===========
+const B=document.getElementById('board');
+const DT=document.getElementById('done-top');
+const DB=document.getElementById('done-bottom');
+
+// kind: 0=board  1=done-off  2=done-on  3=master  4=super
+function mkImg(v,kind){
+  const im=document.createElement('img');
+  im.src=kind===4?IMG_SUPER(v):kind===3?IMG_MASTER(v):kind>=2?IMG_ON(v):kind===1?IMG_OFF(v):IMG_BOARD(v);
+  im.alt=''+v;im.draggable=false;return im;
+}
+
+function renderDone(){
+  [DT,DB].forEach((el,ri)=>{
+    el.innerHTML='';
+    for(let v=ri*4+1;v<=ri*4+4;v++){
+      const slot=document.createElement('div');
+      slot.className='done-slot'+(done.has(v)?' got':'');
+      slot.appendChild(mkImg(v,done.has(v)?2:1));
+      el.appendChild(slot);
+    }
+  });
+}
+
+function render(){
+  B.innerHTML='';
+  for(let i=0;i<N;i++){
+    const v=board[i],cell=document.createElement('div');
+    cell.className='cell';
+    if(fadeSet.has(i))cell.classList.add('fi');
+    // En modo maestría: 21.png automático, 31.png si super
+    const kind=allDone()?superDone.has(v)?4:3:0;
+    cell.appendChild(mkImg(v,kind));
+
+    cell.addEventListener('pointerdown',e=>{e.preventDefault()});
+    cell.addEventListener('click',()=>{
+      if(locked)return;
+      if(isWon())return;
+      // Modo maestría: 21.png automático, click → 31.png…
+      if(allDone()){
+        if(!superDone.has(board[i])){
+          superDone.add(board[i]);saveSuper();
+          if(superDone.size===8){
+            // Último super: 12 tiles en línea permanente
+            game.classList.add('won');
+            [...B.children].forEach((c,i)=>c.style.transitionDelay=(i*.05)+'s');
+            return;
+          }
+        }
+        render();return;
+      }
+      locked=true;
+      const s=SYM[board[i]],r=s.act(i,board);
+      if(!r){locked=false;return;}
+      history.push(board.slice());
+      if(r.ch)r.ch.forEach((d,j)=>{board[j]=wrap(board[j],d)});
+      if(r.st)r.st.forEach((nv,j)=>{board[j]=nv});
+      moves++;
+      fadeSet=new Set(r.af);
+      if(fadeT)clearTimeout(fadeT);
+      fadeT=setTimeout(()=>{fadeSet=new Set();render();locked=false;},350);
+      render();
+      // ¿Ganó?
+      if(isWon()){
+        const won=board[0];
+        if(!done.has(won)){done.add(won);saveDone();renderDone()}
+        // Flash y reset
+        for(const c of B.children)c.classList.add('win');
+        setTimeout(()=>{
+          board=INIT.slice();moves=0;history=[];fadeSet=new Set();render();locked=false;
+        },700);
+      }
+    });
+    cell.addEventListener('pointerenter',()=>{touching||cell.classList.add('hl')});
+    cell.addEventListener('pointerleave',()=>{cell.classList.remove('hl')});
+    B.appendChild(cell);
+  }
+}
+
+// =========== NAV ===========
+const home=document.getElementById('home');
+const game=document.getElementById('game');
+const back=document.getElementById('back');
+const resetBtn=document.getElementById('reset-btn');
+
+document.getElementById('play-btn').addEventListener('click',()=>{
+  board=INIT.slice();moves=0;history=[];locked=false;
+  fadeSet=new Set();home.style.display='none';game.classList.add('active');back.classList.add('active');resetBtn.classList.add('active');
+  if(superDone.size===8)game.classList.add('won');
+  renderDone();render();
+  if(superDone.size===8)[...B.children].forEach((c,i)=>c.style.transitionDelay=(i*.05)+'s');
+});
+back.addEventListener('click',()=>{
+  fadeSet=new Set();board=INIT.slice();moves=0;history=[];locked=false;
+  game.classList.remove('active','won');back.classList.remove('active');resetBtn.classList.remove('active');home.style.display='';
+});
+resetBtn.addEventListener('click',()=>{
+  if(!confirm('¿Borrar todo el progreso?'))return;
+  done.clear();superDone.clear();saveDone();saveSuper();
+  board=INIT.slice();moves=0;history=[];locked=false;fadeSet=new Set();
+  game.classList.remove('won');
+  renderDone();render();
+});
+document.getElementById('auto-btn').addEventListener('click',()=>{
+  done=new Set([1,2,3,4,5,7,8]);saveDone();
+  renderDone();
+});
+window.addEventListener('touchstart',()=>{touching=true},{once:true});
+
+// init
+loadDone();
+loadSuper();
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"3279d41ec7804124a29acc6e692f9a2b","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
